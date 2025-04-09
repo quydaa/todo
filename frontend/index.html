@@ -76,7 +76,7 @@
         Cho phép tạm dừng hàm tại đó, nhưng không làm treo cả trang web. Nghĩa là có thể thao tác khác như cuộn web,... 
         Và khi server phản hồi xong, thì nó tiếp tục từ dòng await.
          */
-    try {//try...catch khoanh vùng code và catch là nơi xử lý nếu có lỗi
+    
         const response = await fetch('http://localhost:8080/v1/notes', {// gọi api với fetch(), lưu phản hổi trong biến response
             method: 'GET',
             headers: { /* trong 1 request, có 3 phần. 1. Request Line        ➜ GET /v1/notes HTTP/1.1
@@ -98,22 +98,14 @@
                                    - Bạn cần gửi request mà cookie phải được đính kèm, nếu không server sẽ không nhận ra người dùng.*/
         });
 
-        if (!response.ok) { // if (!response.ok) Nếu phản hồi từ server KHÔNG thành công
-                            // Kiểm tra xem phản hồi HTTP (được gán vào biến response) từ server có thành công hay không.
-                            //response.ok là một thuộc tính có sẵn của đối tượng Response (trong Fetch API).
-            throw new Error(`HTTP error! status: ${response.status}`);// Tạo một lỗi mới với nội dung "HTTP error! status: xxx" nếu phản hồi thát bại
-        }
+        
 
-        const result = await response.json();
-        displayNotes(result.data);
-    } catch (error) {
-        console.error('Error fetching notes:', error);
-        document.getElementById('todoList').innerHTML = 
-            '<p style="color: red;">Error loading notes.</p>';
-    }
+        const result = await response.json();// .json() là hàm có sẵn để giải mã nội dung trả về từ server (JSON) sang JavaScript object.
+        displayNotes(result.data);//result.data là mảng các note. displayNotes() là một hàm duyệt mảng này và hiển thị nó ra màn hình
+    
 }
 
-        // Display notes in UI
+        
         function displayNotes(notes) {
             const todoList = document.getElementById('todoList');
             todoList.innerHTML = '';
@@ -186,7 +178,7 @@
             }
         }
 
-        // Edit note (fill form with existing data)
+        // Edit note 
         function editNote(id, detailedNote, userId) {
             document.getElementById('noteId').value = id;
             document.getElementById('detailedNote').value = detailedNote;
