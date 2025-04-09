@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+     <meta charset="UTF-8"> <!--hiển thị tiếng việt ko bị lỗi -->
+    
+    <title>Todo List</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .todo-container {
+            margin-top: 20px;
+        }
+        .todo-item {
+            padding: 10px;
+            border: 1px solid #ddd;
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        button {
+            padding: 5px 10px;
+            margin: 0 5px;
+            cursor: pointer;
+        }
+        textarea {
+            width: 100%;
+            min-height: 100px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Todo List</h1>
+    
+    <!-- Form thêm/sửa -->
+    <div class="form-group">
+        <input type="hidden" id="noteId">   <!-- cái này dùng cho edit, khi bấm edit thì gán giá trị id của note vào đây, ko cần hiện 
+                                            vì ko sửa đổi id của note, khỏi hiện lên cho rối  -->
+        <!--  -->
+        <textarea id="detailedNote" placeholder="Enter your note"></textarea>
+        <input type="number" id="userId" placeholder="User ID">
+       
+        <button onclick="saveNote()">Save</button> <!-- Gọi hàm JavaScript khi bấm nút.
+                                                   Nút lưu. Khi lưu có 2th: lưu khi sửa và lưu khi tạo mới. Phân biệt bằng cách cheack xem
+                                                   trường noteId, trường ẩn chứa id note xem có chưa giá trị không, nếu có thì là TH sửa, gọi 
+                                                   api UPDATE, nếu trống thì là tạo mới, gọi api CREATE -->
+        <button onclick="clearForm()">Clear</button><!--xóa hết nội dung trong form   -->
+    </div>
+
+    <!-- Danh sách todo -->
+    <div class="todo-container" id="todoList"></div> <!-- nơi hiển thị các todo -->
+
+    <script>
+        const API_URL = 'http://localhost:8080/v1/notes'; // khai báo một hằng là API_URL để chứa url cơ sở của API -> url dùng nhất quán, 
+                                                          // ko sợ nhập nhiều lần thì nhập sai ở chỗ nào đó. Ngắn gọn hơn khi cần dùng, 
+                                                          // khi cần sửa chỉ cần sửa ở một chỗ.
+
+        
+        window.onload = function() { // cái này ý là nó sẽ tự động chạy khi load trang luôn
+            fetchNotes(); // gọi hàm fetchNotes() để lấy danh sách todo
+        }
+
+        // Fetch all notes
+        async function fetchNotes() { // hàm dùng để gọi api lấy dữ liệu về
+        /* một kiểu hàm em mới thấy lần đầu. Bởi vì JavaScript là ngôn ngữ xử lý đơn luồng-> chỉ xử lý 1 việc trong 1 thời điểm (gọi là đồng bộ)-> khi chờ phản hồi
+        database hay gì, thì web bị đóng băng, không thể thao tác gì cả, vì nó chờ dữ liệu tới rồi mới hoạt động tiếp. Ảnh hưởng trải nghiệm người dùng.
+        Vậy async/await giúp gì? 
+        async: Đánh dấu hàm này chứa các thao tác bất đồng bộ. Tại sao cần async? Vì await chỉ được dùng trong hàm async. Mà Câu lệnh await fetch(...):
+        Cho phép tạm dừng hàm tại đó, nhưng không làm treo cả trang web. Nghĩa là có thể thao tác khác như cuộn web,... 
+        Và khi server phản hồi xong, thì nó tiếp tục từ dòng await.
+         */
+    try {//try...catch khoanh vùng code và catch là nơi xử lý nếu có lỗi
+        const response = await fetch('http://localhost:8080/v1/notes', {// gọi api với fetch(), lưu phản hổi trong biến response
+            method: 'GET',
+            headers: { /* trong 1 request, có 3 phần. 1. Request Line        ➜ GET /v1/notes HTTP/1.1
+                                                      2. Headers             ➜ Content-Type: application/json
+                                                      3. Body (nếu có)       ➜ JSON: { "user_id": 1, ... } 
+                            Headers là những "dòng mô tả đi kèm" với một request hoặc response. Giúp mô tả:
+                            Dữ liệu gửi là gì:	Content-Type: application/json (Tôi đang gửi JSON)
+                            Dữ liệu muốn nhận là gì:	Accept: application/json (Tôi muốn nhận JSON)
+                            ...                                                                  */
+
+                'Content-Type': 'application/json',
+            },
+            credentials: 'include' /*Tùy chọn credentials: 'include' trong hàm fetch() quy định cách trình duyệt xử lý cookies và thông tin xác thực khi gọi API.
+                                   Tác dụng chính:
+                                   - Server dùng cookie để xác thực người dùng (login).
+                                   - Frontend và backend khác origin (ví dụ: frontend ở localhost:5500, backend ở localhost:8080).
+                                   Bởi vì trình duyệt mặc định KHÔNG gửi cookie hoặc token nếu frontend và backend không cùng origin. khi có credentials: 'include', 
+                                   tương tự với nói "Dù khác origin, hãy gửi credentials (cookie) giùm tôi."
+                                   - Bạn cần gửi request mà cookie phải được đính kèm, nếu không server sẽ không nhận ra người dùng.*/
+        });
+
+        if (!response.ok) { // if (!response.ok) Nếu phản hồi từ server KHÔNG thành công
+                            // Kiểm tra xem phản hồi HTTP (được gán vào biến response) từ server có thành công hay không.
+                            //response.ok là một thuộc tính có sẵn của đối tượng Response (trong Fetch API).
+            throw new Error(`HTTP error! status: ${response.status}`);// Tạo một lỗi mới với nội dung "HTTP error! status: xxx" nếu phản hồi thát bại
+        }
+
+        const result = await response.json();
+        displayNotes(result.data);
+    } catch (error) {
+        console.error('Error fetching notes:', error);
+        document.getElementById('todoList').innerHTML = 
+            '<p style="color: red;">Error loading notes. Please check console.</p>';
+    }
+}
+
+        // Display notes in UI
+        function displayNotes(notes) {
+            const todoList = document.getElementById('todoList');
+            todoList.innerHTML = '';
+
+            notes.forEach(note => {
+                const div = document.createElement('div');
+                div.className = 'todo-item';
+                div.innerHTML = `
+                    <div>
+                        <strong>ID: ${note.id}</strong> - ${note.detailed_note}
+                        <br>User ID: ${note.user_id}
+                        <br>Created: ${new Date(note.created_at).toLocaleString()}
+                    </div>
+                    <div>
+                        <button onclick="editNote(${note.id}, '${note.detailed_note}', ${note.user_id})">Edit</button>
+                        <button onclick="deleteNote(${note.id})">Delete</button>
+                    </div>
+                `;
+                todoList.appendChild(div);
+            });
+        }
+
+        // Save note (create or update)
+        async function saveNote() {
+            const noteId = document.getElementById('noteId').value;
+            const detailedNote = document.getElementById('detailedNote').value;
+            const userId = document.getElementById('userId').value;
+
+            if (!detailedNote || !userId) {
+                alert('Please fill all fields');
+                return;
+            }
+
+            const noteData = {
+                detailed_note: detailedNote,
+                user_id: parseInt(userId)
+            };
+
+            try {
+                let response;
+                if (noteId) {
+                    // Update existing note
+                    response = await fetch(`${API_URL}/${noteId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(noteData)
+                    });
+                } else {
+                    // Create new note
+                    response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(noteData)
+                    });
+                }
+
+                if (response.ok) {
+                    clearForm();
+                    fetchNotes();
+                } else {
+                    const error = await response.json();
+                    alert('Error: ' + error.error);
+                }
+            } catch (error) {
+                console.error('Error saving note:', error);
+            }
+        }
+
+        // Edit note (fill form with existing data)
+        function editNote(id, detailedNote, userId) {
+            document.getElementById('noteId').value = id;
+            document.getElementById('detailedNote').value = detailedNote;
+            document.getElementById('userId').value = userId;
+        }
+
+        // Delete note
+        async function deleteNote(id) {
+            if (!confirm('Are you sure you want to delete this note?')) return;
+
+            try {
+                const response = await fetch(`${API_URL}/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    fetchNotes();
+                } else {
+                    const error = await response.json();
+                    alert('Error: ' + error.error);
+                }
+            } catch (error) {
+                console.error('Error deleting note:', error);
+            }
+        }
+
+        // Clear form
+        function clearForm() {
+            document.getElementById('noteId').value = '';
+            document.getElementById('detailedNote').value = '';
+            document.getElementById('userId').value = '';
+        }
+    </script>
+</body>
+</html>
